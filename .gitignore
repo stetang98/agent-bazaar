@@ -1,0 +1,28 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+*.key
+**/secrets/**
+
+# Node
+node_modules/
+dist/
+build/
+.next/
+.vercel/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# Foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/**/dry-run/
+contracts/.gas-snapshot.tmp
+
+# Misc
+.DS_Store
+coverage/
+*.local
