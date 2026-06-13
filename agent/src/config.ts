@@ -8,7 +8,7 @@ const EnvSchema = z.object({
   RPC_URL: z.string().url(),
   CHAIN_ID: z.coerce.number().int().default(421614),
   AGENT_PK: pk,
-  FACILITATOR_PK: pk.optional(),
+  FACILITATOR_PK: z.preprocess((v) => (v === "" ? undefined : v), pk.optional()),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().default("gpt-4o-mini"),
   IDENTITY_REGISTRY: addr,

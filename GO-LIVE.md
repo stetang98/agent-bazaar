@@ -5,6 +5,10 @@
 
 ---
 
+## 你的 dev 钱包
+
+`0xad4eF0597Eab18C69C7beB1a251e91Cc76cB8044` — 已链上校验 ✓（部署 + agent 都用这个钱包）
+
 ## 📋 总表：需要你提供的值
 
 | 值 | 谁填 | 从哪来 |
@@ -19,18 +23,25 @@
 
 ## ☑️ 第 1 步：领测试币
 
-### 1A · 领 ETH（付 gas 用）
+### 1A · 领 ETH（付 gas 用，必须是 Arbitrum Sepolia）
 
-你正在用的 **QuickNode** 页面（[faucet.quicknode.com/arbitrum/sepolia](https://faucet.quicknode.com/arbitrum/sepolia)）：
-- [ ] 在 `0x...` 框里**粘贴你的钱包地址**
-- [ ] 右边确认是 **Arbitrum / Sepolia**（默认已对）
-- [ ] 点 **Continue** → 选额度（~0.05 ETH 够了）→ 领取
+> ⚠️ 实测：主流 faucet 都拿"主网持仓"防女巫，新钱包会被拦——QuickNode/Alchemy 要 ≥0.001 ETH 主网、Chainlink 要 ≥1 LINK 主网、Google 列表里根本没有 Arbitrum。按下面来：
 
-> ⚠️ 如果它要求"主网有少量 ETH"或"发推文"——换备选：
-> - Alchemy: https://www.alchemy.com/faucets/arbitrum-sepolia
-> - Chainlink: https://faucets.chain.link/arbitrum-sepolia
-> - 实在不行：领 L1 Sepolia ETH（sepoliafaucet.com）→ 用 bridge.arbitrum.io 跨到 Arb Sepolia
-> **只需要 ~0.02 ETH** 就够部署 + demo。
+> ⚠️ 实测：**所有免费 faucet 都要求收款钱包"在以太坊主网有过活动/余额"防刷**（QuickNode 要 0.001 ETH 主网、Chainlink 要 1 LINK 主网、LearnWeb3 要主网历史、thirdweb 已付费化、Google 无 Arbitrum）。全新的 dev 钱包过不了门槛。两个解法：
+
+**解法 1（免费）· 用一个有"主网历史"或"已有测试 ETH"的旧钱包**
+- 旧钱包已有 Arb Sepolia 测试 ETH → 直接当部署钱包（把地址发我）
+- 旧钱包在以太坊主网用过 → 用它去 LearnWeb3/QuickNode 领 → 再把 Arb Sepolia ETH 转给 dev 钱包
+
+**解法 2（最稳，已执行）· 给 dev 钱包充一点主网余额，再用"看余额"的 faucet**
+- 交易所 → 提现 → ETH → 网络选 **Ethereum 主网（ERC20）** → 地址 `0xad4eF0597Eab18C69C7beB1a251e91Cc76cB8044` → ~0.005 ETH ✅ 已到账
+- 到账后用 **Alchemy**（查"主网余额 ≥0.001"，会过）领：https://www.alchemy.com/faucets/arbitrum-sepolia
+  - ⚠️ QuickNode 查的是"交易历史"(nonce>0)，新钱包仍卡；用 Alchemy（查余额）。
+
+**解法 3（零门槛兜底）· pk910 PoW 挖矿 + 桥**
+- https://sepolia-faucet.pk910.de/ 浏览器挖 Sepolia ETH（不查余额/历史）→ [bridge.arbitrum.io](https://bridge.arbitrum.io) 桥到 Arbitrum Sepolia
+
+> **只需要 ~0.02 ETH** 就够部署 3 个合约 + demo。
 
 ### 1B · 领 USDC（给 agent 付费用）
 
