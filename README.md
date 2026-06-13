@@ -91,14 +91,14 @@ Contract tests: `cd contracts && forge test`. Agent loop test without the UI: `c
 
 ## Deployed addresses (Arbitrum Sepolia)
 
-> Filled in after deployment — see `contracts/deployments/arbitrum-sepolia.json`.
+Live on Arbitrum Sepolia (chainId 421614):
 
 | Contract | Address |
 |---|---|
-| IdentityRegistry | `TBD` |
-| ReputationRegistry | `TBD` |
-| PaymentEscrow | `TBD` |
-| USDC (Circle) | `0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d` |
+| IdentityRegistry | [`0x7d5304e603bd8022E640b0309bC82f29456c459A`](https://sepolia.arbiscan.io/address/0x7d5304e603bd8022E640b0309bC82f29456c459A) |
+| ReputationRegistry | [`0xDFD69428A577E631A9Ea212BC04190825f5dB398`](https://sepolia.arbiscan.io/address/0xDFD69428A577E631A9Ea212BC04190825f5dB398) |
+| PaymentEscrow | [`0xAf2e64507184a3795e6c4E65044E85Be0F45407c`](https://sepolia.arbiscan.io/address/0xAf2e64507184a3795e6c4E65044E85Be0F45407c) |
+| USDC (Circle) | [`0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d`](https://sepolia.arbiscan.io/address/0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d) |
 
 ## How it maps to the judging criteria
 
