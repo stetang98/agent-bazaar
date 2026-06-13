@@ -41,8 +41,8 @@ This exercises the two primitives the buildathon ran workshops on (ERC-8004 agen
      │──4 retry w/ X-PAYMENT header──▶ [Agent backend] ─verify─▶ [x402 facilitator] ─settle─▶ USDC into PaymentEscrow (emit TaskPaid)
      │                                       └─ runs LLM audit
      │◀─5 200 + audit result + on-chain receipt ──┘
-     │──6 submit rating──▶ ReputationRegistry (gated by TaskPaid receipt — only payers can rate)
-     │◀─7 reputation refreshes live
+     │──6 submit rating──▶ ReputationRegistry (permissionless per ERC-8004 — feedbackAuth was removed)
+     │◀─7 reputation refreshes live; dApp shows "verified buyer ✓" via TaskPaid receipts + the spec's clientAddresses filter
 ```
 
 Each agent at boot: registers on `IdentityRegistry` and serves an A2A AgentCard at `/.well-known/agent-card.json`.
@@ -54,11 +54,11 @@ Each agent at boot: registers on `IdentityRegistry` and serves an A2A AgentCard 
 
 ## 4. Smart contracts (judged first — highest priority)
 
-- **`IdentityRegistry.sol`** (ERC-8004): register/update agent; `agentId ↔ address ↔ domain`; metadata (AgentCard) URI; `AgentRegistered` event; lookups.
-- **`ReputationRegistry.sol`** (ERC-8004): consumer submits feedback (score + optional URI); **gated by `PaymentEscrow` receipt** (only real payers can rate → anti-sybil); aggregate score view.
+- **`IdentityRegistry.sol`** (ERC-8004, **ERC-721** — agentId = tokenId): `register(agentURI, metadata[])`; `agentURI` → off-chain registration JSON (sets `x402Support: true` + lists the A2A AgentCard service); reserved `agentWallet` key set via EIP-712/ERC-1271 sig and auto-reset on transfer; `Registered` event.
+- **`ReputationRegistry.sol`** (ERC-8004): `giveFeedback` is **permissionless** (the spec removed `feedbackAuth` in the Jan 2026 update — we stay faithful, no on-chain gating); signed fixed-point score (`int128 value` + `uint8 valueDecimals`); `getSummary`/`readAllFeedback` accept a `clientAddresses[]` filter. **Anti-sybil lives off the standard:** the dApp filters reputation to "verified buyers" using `PaymentEscrow` TaskPaid receipts — exactly the reviewer-filtering the spec intends.
 - **`PaymentEscrow.sol`**: the x402 `payTo` target. `settle(...)` pulls USDC via **`receiveWithAuthorization` (EIP-3009)** with the escrow as `to` (msg.sender), records `TaskPaid(payer, agentId, amount, taskId)`, emits event, and pull-pays the agent. Showcases real Solidity: EIP-3009 integration, reentrancy safety, access control.
 - *(stretch)* **`ValidationRegistry.sol`** (ERC-8004 third registry).
-- **Conformance:** verify exact ERC-8004 interfaces against the EIP **before** writing (research step in the plan).
+- **Conformance:** interfaces verified against EIP-8004 (Draft, Jan 2026 update) + the ChaosChain `trustless-agents-erc-ri` reference impl. Build on **OpenZeppelin v5** (`_update` hook for the agentWallet transfer-reset). Validation Registry is experimental per spec → P2/optional.
 - **Security:** OZ `Ownable` / `ReentrancyGuard` / `SafeERC20`; checks-effects-interactions; custom errors; full NatSpec.
 - **Tests:** Foundry unit + fuzz (registration, reputation gating, EIP-3009 settle path, access control, reentrancy); target high coverage.
 
