@@ -17,6 +17,7 @@ pnpm-debug.log*
 yarn-error.log*
 
 # Foundry
+contracts/lib/
 contracts/out/
 contracts/cache/
 contracts/broadcast/**/dry-run/
