@@ -3,18 +3,22 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {ReputationRegistry} from "../src/ReputationRegistry.sol";
+import {IdentityRegistry} from "../src/IdentityRegistry.sol";
 
 contract ReputationRegistryTest is Test {
+    IdentityRegistry identity;
     ReputationRegistry rep;
 
     uint256 constant AGENT = 1;
+    address agentOwner = makeAddr("agentOwner");
     address clientA = makeAddr("clientA");
     address clientB = makeAddr("clientB");
-    address identity = makeAddr("identity");
 
     function setUp() public {
-        rep = new ReputationRegistry();
-        rep.initialize(identity);
+        identity = new IdentityRegistry();
+        vm.prank(agentOwner);
+        identity.register("ipfs://agent"); // agentId 1 now exists
+        rep = new ReputationRegistry(address(identity));
     }
 
     function _give(address who, int128 value, uint8 dec, string memory tag1) internal {
@@ -22,10 +26,15 @@ contract ReputationRegistryTest is Test {
         rep.giveFeedback(AGENT, value, dec, tag1, "", "https://agent/audit", "", bytes32(0));
     }
 
-    function test_InitializeOnce() public {
-        assertEq(rep.getIdentityRegistry(), identity);
-        vm.expectRevert();
-        rep.initialize(address(0xBEEF));
+    function _give2(address who, int128 value, uint8 dec, string memory tag1, string memory tag2) internal {
+        vm.prank(who);
+        rep.giveFeedback(AGENT, value, dec, tag1, tag2, "https://agent/audit", "", bytes32(0));
+    }
+
+    function test_IdentitySetAndConstructorRejectsZero() public {
+        assertEq(rep.getIdentityRegistry(), address(identity));
+        vm.expectRevert(ReputationRegistry.ZeroAddress.selector);
+        new ReputationRegistry(address(0));
     }
 
     function test_GiveFeedbackRecords() public {
@@ -48,7 +57,16 @@ contract ReputationRegistryTest is Test {
         (uint64 count, int128 val, uint8 dec) = rep.getSummary(AGENT, none, "", "");
         assertEq(count, 2);
         assertEq(dec, 2);
-        assertEq(val, 450); // 4.50 averaged, expressed with 2 decimals
+        assertEq(val, 450); // 4.50
+    }
+
+    function test_NegativeValueAveraging() public {
+        _give(clientA, 4, 0, "");
+        _give(clientB, -2, 0, "");
+        address[] memory none = new address[](0);
+        (uint64 count, int128 val,) = rep.getSummary(AGENT, none, "", "");
+        assertEq(count, 2);
+        assertEq(val, 100); // (4 + -2) / 2 = 1.00
     }
 
     function test_SummaryFilteredByClient() public {
@@ -61,7 +79,7 @@ contract ReputationRegistryTest is Test {
         assertEq(val, 400);
     }
 
-    function test_SummaryFilteredByTag() public {
+    function test_SummaryFilteredByTag1() public {
         _give(clientA, 5, 0, "audit");
         _give(clientA, 1, 0, "spam");
         address[] memory none = new address[](0);
@@ -71,6 +89,20 @@ contract ReputationRegistryTest is Test {
         (uint64 c2, int128 v2,) = rep.getSummary(AGENT, none, "", "");
         assertEq(c2, 2);
         assertEq(v2, 300);
+    }
+
+    function test_SummaryFilteredByTag2() public {
+        _give2(clientA, 5, 0, "audit", "v1");
+        _give2(clientA, 1, 0, "audit", "v2");
+        address[] memory none = new address[](0);
+        (uint64 c, int128 v,) = rep.getSummary(AGENT, none, "", "v1");
+        assertEq(c, 1);
+        assertEq(v, 500);
+    }
+
+    function test_ValueDecimals18Allowed() public {
+        _give(clientA, 1, 18, "audit"); // boundary of the <= 18 guard
+        assertEq(rep.getLastIndex(AGENT, clientA), 1);
     }
 
     function test_RevokeExcludesFromSummary() public {
@@ -86,13 +118,39 @@ contract ReputationRegistryTest is Test {
 
     function test_RevokeBadIndexReverts() public {
         vm.prank(clientB);
-        vm.expectRevert();
+        vm.expectRevert(ReputationRegistry.BadIndex.selector);
         rep.revokeFeedback(AGENT, 0);
     }
 
     function test_RejectsInvalidDecimals() public {
         vm.prank(clientA);
-        vm.expectRevert();
+        vm.expectRevert(ReputationRegistry.InvalidDecimals.selector);
         rep.giveFeedback(AGENT, 5, 19, "audit", "", "", "", bytes32(0));
+    }
+
+    function test_RejectsValueOutOfRange() public {
+        vm.prank(clientA);
+        vm.expectRevert(ReputationRegistry.ValueOutOfRange.selector);
+        rep.giveFeedback(AGENT, int128(2e15), 0, "audit", "", "", "", bytes32(0));
+    }
+
+    function test_RejectsFeedbackForUnknownAgent() public {
+        vm.prank(clientA);
+        vm.expectRevert(ReputationRegistry.UnknownAgent.selector);
+        rep.giveFeedback(999, 5, 0, "audit", "", "", "", bytes32(0));
+    }
+
+    function testFuzz_GiveFeedbackValueBound(int128 value) public {
+        vm.prank(clientA);
+        if (value > 1e15 || value < -1e15) {
+            vm.expectRevert(ReputationRegistry.ValueOutOfRange.selector);
+            rep.giveFeedback(AGENT, value, 0, "f", "", "", "", bytes32(0));
+        } else {
+            rep.giveFeedback(AGENT, value, 0, "f", "", "", "", bytes32(0));
+            assertEq(rep.getLastIndex(AGENT, clientA), 1);
+            // In-range values must never overflow the int128 summary.
+            address[] memory none = new address[](0);
+            rep.getSummary(AGENT, none, "", "");
+        }
     }
 }

@@ -16,13 +16,14 @@ import {IIdentityRegistry, MetadataEntry} from "./interfaces/IIdentityRegistry.s
 /// @dev Faithful to EIP-8004 (Draft, Jan 2026 update). Built on OpenZeppelin v5.
 contract IdentityRegistry is IIdentityRegistry, ERC721URIStorage, EIP712, ReentrancyGuard {
     bytes32 private constant SET_WALLET_TYPEHASH =
-        keccak256("SetAgentWallet(uint256 agentId,address newWallet,uint256 deadline)");
+        keccak256("SetAgentWallet(uint256 agentId,address newWallet,uint256 deadline,uint256 nonce)");
     bytes32 private constant RESERVED_WALLET_KEY = keccak256(bytes("agentWallet"));
 
     uint256 private _nextId = 1; // agentId starts at 1 (0 == non-existent)
 
     mapping(uint256 agentId => mapping(string key => bytes value)) private _metadata;
     mapping(uint256 agentId => address wallet) private _agentWallet;
+    mapping(uint256 agentId => uint256 nonce) private _walletNonce; // EIP-712 single-use replay guard
 
     error ReservedKey();
     error NotAuthorized();
@@ -67,6 +68,7 @@ contract IdentityRegistry is IIdentityRegistry, ERC721URIStorage, EIP712, Reentr
         if (bytes(agentURI).length > 0) _setTokenURI(agentId, agentURI);
         _agentWallet[agentId] = to; // wallet defaults to the owner
         emit MetadataSet(agentId, "agentWallet", "agentWallet", abi.encodePacked(to));
+        emit AgentWalletSet(agentId, to, to); // consistent event stream for off-chain indexers
         emit Registered(agentId, agentURI, to);
     }
 
@@ -110,8 +112,13 @@ contract IdentityRegistry is IIdentityRegistry, ERC721URIStorage, EIP712, Reentr
     {
         _requireOwnerOrApproved(agentId);
         if (block.timestamp > deadline) revert SignatureExpired();
-        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(SET_WALLET_TYPEHASH, agentId, newWallet, deadline)));
+        uint256 nonce = _walletNonce[agentId];
+        bytes32 digest =
+            _hashTypedDataV4(keccak256(abi.encode(SET_WALLET_TYPEHASH, agentId, newWallet, deadline, nonce)));
         if (!SignatureChecker.isValidSignatureNow(newWallet, digest, signature)) revert InvalidSignature();
+        unchecked {
+            _walletNonce[agentId] = nonce + 1; // consume the signature (single-use)
+        }
         _agentWallet[agentId] = newWallet;
         emit AgentWalletSet(agentId, newWallet, msg.sender);
     }
@@ -119,6 +126,11 @@ contract IdentityRegistry is IIdentityRegistry, ERC721URIStorage, EIP712, Reentr
     /// @inheritdoc IIdentityRegistry
     function getAgentWallet(uint256 agentId) external view override returns (address wallet) {
         return _agentWallet[agentId];
+    }
+
+    /// @notice Current EIP-712 nonce for an agent's setAgentWallet signature (replay protection).
+    function walletNonce(uint256 agentId) external view returns (uint256) {
+        return _walletNonce[agentId];
     }
 
     /// @inheritdoc IIdentityRegistry
@@ -150,7 +162,8 @@ contract IdentityRegistry is IIdentityRegistry, ERC721URIStorage, EIP712, Reentr
     /// @dev Clears `agentWallet` on transfer (not on mint/burn) so the new owner must re-verify.
     function _update(address to, uint256 tokenId, address auth) internal override(ERC721) returns (address from) {
         from = super._update(to, tokenId, auth);
-        if (from != address(0) && to != address(0)) {
+        // Clear the verified wallet on transfer AND burn (skip mint, where from == 0).
+        if (from != address(0)) {
             _agentWallet[tokenId] = address(0);
             emit AgentWalletSet(tokenId, address(0), from);
         }

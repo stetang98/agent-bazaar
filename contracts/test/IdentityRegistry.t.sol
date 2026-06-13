@@ -13,7 +13,7 @@ contract IdentityRegistryTest is Test {
 
     string constant URI = "https://agent.example/.well-known/agent-registration.json";
     bytes32 constant SET_WALLET_TYPEHASH =
-        keccak256("SetAgentWallet(uint256 agentId,address newWallet,uint256 deadline)");
+        keccak256("SetAgentWallet(uint256 agentId,address newWallet,uint256 deadline,uint256 nonce)");
 
     function setUp() public {
         reg = new IdentityRegistry();
@@ -28,6 +28,14 @@ contract IdentityRegistryTest is Test {
         assertEq(reg.totalAgents(), 1);
         assertTrue(reg.agentExists(1));
         assertFalse(reg.agentExists(2));
+    }
+
+    function test_RegisterNoArg() public {
+        vm.prank(owner);
+        uint256 id = reg.register();
+        assertEq(id, 1);
+        assertEq(reg.ownerOf(1), owner);
+        assertEq(reg.getAgentWallet(1), owner);
     }
 
     function test_RegisterDefaultsAgentWalletToOwner() public {
@@ -57,7 +65,7 @@ contract IdentityRegistryTest is Test {
         MetadataEntry[] memory md = new MetadataEntry[](1);
         md[0] = MetadataEntry("agentWallet", abi.encodePacked(other));
         vm.prank(owner);
-        vm.expectRevert();
+        vm.expectRevert(IdentityRegistry.ReservedKey.selector);
         reg.register(URI, md);
     }
 
@@ -65,7 +73,7 @@ contract IdentityRegistryTest is Test {
         vm.prank(owner);
         uint256 id = reg.register(URI);
         vm.prank(owner);
-        vm.expectRevert();
+        vm.expectRevert(IdentityRegistry.ReservedKey.selector);
         reg.setMetadata(id, "agentWallet", abi.encodePacked(other));
     }
 
@@ -82,7 +90,7 @@ contract IdentityRegistryTest is Test {
         uint256 id = reg.register(URI);
 
         vm.prank(other);
-        vm.expectRevert();
+        vm.expectRevert(IdentityRegistry.NotAuthorized.selector);
         reg.setAgentURI(id, "ipfs://new");
 
         vm.prank(owner);
@@ -101,6 +109,7 @@ contract IdentityRegistryTest is Test {
         vm.prank(owner);
         reg.setAgentWallet(id, newWallet, deadline, sig);
         assertEq(reg.getAgentWallet(id), newWallet);
+        assertEq(reg.walletNonce(id), 1);
     }
 
     function test_SetAgentWalletRejectsExpired() public {
@@ -113,7 +122,7 @@ contract IdentityRegistryTest is Test {
 
         vm.warp(block.timestamp + 2);
         vm.prank(owner);
-        vm.expectRevert();
+        vm.expectRevert(IdentityRegistry.SignatureExpired.selector);
         reg.setAgentWallet(id, newWallet, deadline, sig);
     }
 
@@ -127,8 +136,44 @@ contract IdentityRegistryTest is Test {
         bytes memory sig = _sign(attackerPk, id, newWallet, deadline);
 
         vm.prank(owner);
-        vm.expectRevert();
+        vm.expectRevert(IdentityRegistry.InvalidSignature.selector);
         reg.setAgentWallet(id, newWallet, deadline, sig);
+    }
+
+    function test_SetAgentWalletSignatureNotReplayable() public {
+        vm.prank(owner);
+        uint256 id = reg.register(URI);
+
+        (address newWallet, uint256 pk) = makeAddrAndKey("newWallet");
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory sig = _sign(pk, id, newWallet, deadline); // nonce 0
+
+        vm.prank(owner);
+        reg.setAgentWallet(id, newWallet, deadline, sig);
+
+        vm.prank(owner);
+        reg.unsetAgentWallet(id);
+
+        // Replaying the same signature must fail — the nonce has advanced to 1.
+        vm.prank(owner);
+        vm.expectRevert(IdentityRegistry.InvalidSignature.selector);
+        reg.setAgentWallet(id, newWallet, deadline, sig);
+    }
+
+    function test_UnsetAgentWallet() public {
+        vm.prank(owner);
+        uint256 id = reg.register(URI);
+
+        (address newWallet, uint256 pk) = makeAddrAndKey("newWallet");
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory sig = _sign(pk, id, newWallet, deadline);
+        vm.prank(owner);
+        reg.setAgentWallet(id, newWallet, deadline, sig);
+        assertEq(reg.getAgentWallet(id), newWallet);
+
+        vm.prank(owner);
+        reg.unsetAgentWallet(id);
+        assertEq(reg.getAgentWallet(id), address(0));
     }
 
     function test_TransferResetsAgentWallet() public {
@@ -154,7 +199,8 @@ contract IdentityRegistryTest is Test {
         view
         returns (bytes memory)
     {
-        bytes32 structHash = keccak256(abi.encode(SET_WALLET_TYPEHASH, agentId, newWallet, deadline));
+        uint256 nonce = reg.walletNonce(agentId);
+        bytes32 structHash = keccak256(abi.encode(SET_WALLET_TYPEHASH, agentId, newWallet, deadline, nonce));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", reg.DOMAIN_SEPARATOR(), structHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, digest);
         return abi.encodePacked(r, s, v);

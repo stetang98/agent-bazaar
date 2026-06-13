@@ -2,6 +2,8 @@
 pragma solidity ^0.8.20;
 
 import {IReputationRegistry} from "./interfaces/IReputationRegistry.sol";
+import {IIdentityRegistry} from "./interfaces/IIdentityRegistry.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /// @title ReputationRegistry — ERC-8004 reputation (core surface)
 /// @notice Permissionless agent feedback. Anti-sybil is intentionally left off-chain (per the
@@ -20,20 +22,22 @@ contract ReputationRegistry is IReputationRegistry {
 
     uint8 private constant SUMMARY_DECIMALS = 2;
 
-    /// @notice Identity Registry this reputation registry is bound to (set once).
-    address public identityRegistry;
+    /// @notice Identity Registry this reputation registry is bound to (immutable).
+    address public immutable identityRegistry;
 
     mapping(uint256 agentId => mapping(address client => Feedback[])) private _feedback;
     mapping(uint256 agentId => address[]) private _clients;
     mapping(uint256 agentId => mapping(address client => bool)) private _isClient;
 
-    error AlreadyInitialized();
+    error ZeroAddress();
     error InvalidDecimals();
+    error ValueOutOfRange();
+    error UnknownAgent();
     error BadIndex();
 
-    /// @notice Bind to an Identity Registry. Callable once.
-    function initialize(address identityRegistry_) external {
-        if (identityRegistry != address(0)) revert AlreadyInitialized();
+    /// @param identityRegistry_ The Identity Registry to bind to (set atomically at deploy).
+    constructor(address identityRegistry_) {
+        if (identityRegistry_ == address(0)) revert ZeroAddress();
         identityRegistry = identityRegistry_;
     }
 
@@ -49,6 +53,8 @@ contract ReputationRegistry is IReputationRegistry {
         bytes32 feedbackHash
     ) external override {
         if (valueDecimals > 18) revert InvalidDecimals();
+        if (value > 1e15 || value < -1e15) revert ValueOutOfRange();
+        if (!IIdentityRegistry(identityRegistry).agentExists(agentId)) revert UnknownAgent();
         if (!_isClient[agentId][msg.sender]) {
             _clients[agentId].push(msg.sender);
             _isClient[agentId][msg.sender] = true;
@@ -69,6 +75,8 @@ contract ReputationRegistry is IReputationRegistry {
     }
 
     /// @inheritdoc IReputationRegistry
+    /// @dev On-chain callers should pass an explicit `clientAddresses[]`; an empty filter iterates
+    ///      the full permissionless client list and can be gas-griefed. Off-chain eth_call is fine.
     function getSummary(uint256 agentId, address[] calldata clientAddresses, string calldata tag1, string calldata tag2)
         external
         view
@@ -104,7 +112,7 @@ contract ReputationRegistry is IReputationRegistry {
         }
         if (n == 0) return (0, 0, 0);
         int256 avg = sumNorm / int256(n); // mean in 1e18
-        return (uint64(n), int128(avg / 1e16), SUMMARY_DECIMALS); // mean re-expressed with 2 decimals
+        return (uint64(n), SafeCast.toInt128(avg / 1e16), SUMMARY_DECIMALS); // mean, re-expressed with 2 decimals
     }
 
     /// @inheritdoc IReputationRegistry
