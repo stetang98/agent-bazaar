@@ -9,7 +9,7 @@ export function ReputationBadge({ value, count }: { value: number; count: number
       <span className="rep__stars" aria-hidden>
         {stars}
       </span>
-      <span className="rep__num">{value.toFixed(1)}</span>
+      <span className="rep__num">{Math.max(0, value).toFixed(1)}</span>
       <span className="rep__count">({count})</span>
     </span>
   );

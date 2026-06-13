@@ -7,6 +7,7 @@ interface ImportMetaEnv {
   readonly VITE_PAYMENT_ESCROW: string;
   readonly VITE_USDC: string;
   readonly VITE_AGENT_BASE_URL: string;
+  readonly VITE_DEPLOY_BLOCK?: string;
 }
 
 interface ImportMeta {

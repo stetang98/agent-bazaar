@@ -16,9 +16,10 @@ const EnvSchema = z.object({
   PAYMENT_ESCROW: addr,
   USDC: addr.default("0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d"),
   PUBLIC_URL: z.string().url().default("http://localhost:8787"),
-  PRICE_USDC: z.string().default("0.10"),
+  PRICE_USDC: z.string().regex(/^\d+(\.\d+)?$/, "must be a decimal like 0.10").default("0.10"),
   AGENT_ID: z.string().optional(),
   PORT: z.coerce.number().int().default(8787),
+  ALLOWED_ORIGIN: z.string().default("http://localhost:5173"),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

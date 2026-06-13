@@ -2,20 +2,37 @@ import { publicClient } from "../chain";
 import { usdcAbi } from "../abis";
 import { config } from "../config";
 
-let cached: { name: string; version: string } | null = null;
+interface Domain {
+  name: string;
+  version: string;
+}
+
+const TTL_MS = 60 * 60 * 1000; // re-read hourly in case the token is upgraded
+let cache: { value: Domain; at: number } | null = null;
+let inflight: Promise<Domain> | null = null;
 
 /**
- * Reads and caches USDC's EIP-712 domain (name + version) from chain. Required to verify
- * ReceiveWithAuthorization signatures — a wrong domain name is the #1 cause of invalid-signature
- * reverts, so we always read the live values rather than hardcoding "USD Coin"/"2".
+ * USDC's EIP-712 domain (name + version), read from chain and cached with a TTL. Single-flight:
+ * concurrent callers before the first read resolves share one RPC round-trip. A wrong domain name
+ * is the #1 cause of invalid-signature reverts, so we read it rather than hardcode it.
  */
-export async function getUsdcDomain(): Promise<{ name: string; version: string }> {
-  if (cached) return cached;
+export function getUsdcDomain(): Promise<Domain> {
+  if (cache && Date.now() - cache.at < TTL_MS) return Promise.resolve(cache.value);
+  if (inflight) return inflight;
+
   const address = config.USDC as `0x${string}`;
-  const [name, version] = await Promise.all([
+  inflight = Promise.all([
     publicClient.readContract({ address, abi: usdcAbi, functionName: "name" }),
     publicClient.readContract({ address, abi: usdcAbi, functionName: "version" }),
-  ]);
-  cached = { name, version };
-  return cached;
+  ])
+    .then(([name, version]) => {
+      cache = { value: { name, version }, at: Date.now() };
+      inflight = null;
+      return cache.value;
+    })
+    .catch((err) => {
+      inflight = null;
+      throw err;
+    });
+  return inflight;
 }

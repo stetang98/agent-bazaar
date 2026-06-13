@@ -65,12 +65,12 @@ export async function verifyPayment(
     return { isValid: false, reason: "signature does not match `from`" };
   }
 
-  const balance = (await publicClient.readContract({
+  const balance = await publicClient.readContract({
     address: req.asset,
     abi: usdcAbi,
     functionName: "balanceOf",
     args: [a.from],
-  })) as bigint;
+  });
   if (balance < BigInt(a.value)) return { isValid: false, reason: "insufficient USDC balance" };
 
   return { isValid: true, payer: getAddress(a.from) };

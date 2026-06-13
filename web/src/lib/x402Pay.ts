@@ -25,9 +25,14 @@ const RECEIVE_TYPES = {
   ],
 } as const;
 
-function auditUrl(webEndpoint?: string): string {
-  const base = webEndpoint?.replace(/\/+$/, "") || AGENT_BASE_URL;
-  return `${base}/agents/auditor/audit`;
+/** Resolve the agent's audit endpoint; null if neither the agent's webEndpoint nor a base URL is set. */
+export function resolveAuditUrl(webEndpoint?: string): string | null {
+  const base = webEndpoint?.replace(/\/+$/, "") || AGENT_BASE_URL?.replace(/\/+$/, "");
+  return base ? `${base}/agents/auditor/audit` : null;
+}
+
+function isAuditResult(x: unknown): x is AuditResult {
+  return !!x && typeof x === "object" && Array.isArray((x as { findings?: unknown }).findings);
 }
 
 export interface PayAndAuditArgs {
@@ -46,7 +51,8 @@ export interface PayAndAuditResult {
 /** Drive the full x402 "exact" flow from the browser: 402 → sign (gasless) → retry → result. */
 export async function payAndAudit(args: PayAndAuditArgs): Promise<PayAndAuditResult> {
   const { walletClient, account, chainId, source, webEndpoint } = args;
-  const url = auditUrl(webEndpoint);
+  const url = resolveAuditUrl(webEndpoint);
+  if (!url) throw new Error("No agent endpoint configured (set VITE_AGENT_BASE_URL).");
   const body = JSON.stringify({ source });
 
   // 1) Unpaid request — expect HTTP 402 with payment requirements.
@@ -56,7 +62,11 @@ export async function payAndAudit(args: PayAndAuditArgs): Promise<PayAndAuditRes
     body,
   });
   if (challenge.status !== 402) {
-    if (challenge.ok) return { audit: (await challenge.json()) as AuditResult };
+    if (challenge.ok) {
+      const data: unknown = await challenge.json();
+      if (!isAuditResult(data)) throw new Error("unexpected agent response");
+      return { audit: data };
+    }
     throw new Error(`Unexpected ${challenge.status}: ${await challenge.text()}`);
   }
   const { accepts } = (await challenge.json()) as { accepts: PaymentRequirements[] };
@@ -101,7 +111,9 @@ export async function payAndAudit(args: PayAndAuditArgs): Promise<PayAndAuditRes
   });
   if (!paid.ok) throw new Error(`Payment/audit failed ${paid.status}: ${await paid.text()}`);
 
-  const audit = (await paid.json()) as AuditResult;
+  const data: unknown = await paid.json();
+  if (!isAuditResult(data)) throw new Error("unexpected agent response");
+
   let paymentTx: string | undefined;
   const respHeader = paid.headers.get("x-payment-response");
   if (respHeader) {
@@ -111,5 +123,5 @@ export async function payAndAudit(args: PayAndAuditArgs): Promise<PayAndAuditRes
       /* ignore malformed receipt header */
     }
   }
-  return { audit, paymentTx };
+  return { audit: data, paymentTx };
 }

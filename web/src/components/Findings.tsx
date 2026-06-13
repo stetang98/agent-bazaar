@@ -21,7 +21,7 @@ export function Findings({
       </div>
       <ul className="findings__list">
         {sorted.map((f, i) => (
-          <li key={i} className={`finding finding--${f.severity}`}>
+          <li key={`${f.severity}-${f.line}-${i}`} className={`finding finding--${f.severity}`}>
             <div className="finding__head">
               <span className={`sev-dot sev-dot--${f.severity}`} aria-hidden />
               <span className="finding__title">{f.title}</span>

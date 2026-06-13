@@ -19,7 +19,11 @@ export function AgentGrid({ agents, isLoading, error, configured, onSelect }: Pr
     );
   }
   if (isLoading) return <p className="notice surface">Loading agents from chain…</p>;
-  if (error) return <p className="notice surface">Couldn’t load agents: {(error as Error).message}</p>;
+  if (error) {
+    return (
+      <p className="notice surface">Couldn’t load agents from chain. Check the RPC URL and configured addresses.</p>
+    );
+  }
   if (agents.length === 0) return <p className="notice surface">No agents registered yet.</p>;
 
   return (

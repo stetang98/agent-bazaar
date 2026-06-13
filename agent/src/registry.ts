@@ -25,25 +25,25 @@ export async function ensureRegistered(): Promise<AgentIdentity> {
   });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
+  const registry = config.IDENTITY_REGISTRY.toLowerCase();
   let agentId: bigint | undefined;
   for (const log of receipt.logs) {
+    if (log.address.toLowerCase() !== registry) continue; // only decode our registry's logs
     try {
       const decoded = decodeEventLog({ abi: identityRegistryAbi, data: log.data, topics: log.topics });
       if (decoded.eventName === "Registered") {
-        agentId = (decoded.args as { agentId: bigint }).agentId;
+        agentId = decoded.args.agentId;
         break;
       }
     } catch {
-      // log from a different event/ABI — ignore
+      // not a Registered event — ignore
     }
   }
   if (agentId === undefined) {
-    // Fallback: our agent is the most recently registered one.
-    agentId = (await publicClient.readContract({
-      address: config.IDENTITY_REGISTRY as `0x${string}`,
-      abi: identityRegistryAbi,
-      functionName: "totalAgents",
-    })) as bigint;
+    // No racy totalAgents() guess: a missing event is a real error.
+    throw new Error(
+      `Registered event not found in tx ${hash}. Set AGENT_ID in .env to skip auto-registration.`,
+    );
   }
 
   console.log(`[registry] registered agent #${agentId} (tx ${hash}). Set AGENT_ID=${agentId} to skip next boot.`);

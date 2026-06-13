@@ -45,6 +45,11 @@ export async function settlePayment(payload: PaymentPayload, agentId: bigint): P
       s,
     ],
   });
-  await publicClient.waitForTransactionReceipt({ hash });
+  const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 30_000 });
+  if (receipt.status !== "success") {
+    // The on-chain settle reverted (e.g. nonce already used, unknown agent). The payer did NOT
+    // pay — surface this so the caller never receives a paid result for free.
+    throw new Error(`settlement transaction reverted (${hash})`);
+  }
   return { success: true, transaction: hash, payer: a.from };
 }

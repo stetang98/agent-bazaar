@@ -1,14 +1,16 @@
-import { useState } from "react";
-import { useAccount, useWalletClient, useWriteContract } from "wagmi";
+import { useEffect, useRef, useState } from "react";
+import { useAccount, useChainId, useSwitchChain, useWalletClient, useWriteContract } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
 import type { Agent, AuditResult } from "../lib/types";
-import { payAndAudit } from "../lib/x402Pay";
+import { payAndAudit, resolveAuditUrl } from "../lib/x402Pay";
 import { fetchVerifiedBuyers, fetchSummary, type ReputationSummary } from "../lib/reputation";
 import { reputationRegistryAbi } from "../lib/abis";
-import { addresses, CHAIN_ID } from "../lib/addresses";
+import { requireAddresses, CHAIN_ID, isConfigured } from "../lib/addresses";
+import { toMessage } from "../lib/errors";
 import { Findings } from "./Findings";
 
 const ZERO_HASH = "0x0000000000000000000000000000000000000000000000000000000000000000" as const;
+const REP_REFRESH_MS = 3000;
 
 const SAMPLE = `// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
@@ -30,6 +32,8 @@ contract Vault {
 
 export function AgentDetail({ agent, onBack }: { agent: Agent; onBack: () => void }) {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const { switchChain, isPending: switching } = useSwitchChain();
   const { data: walletClient } = useWalletClient();
   const { writeContractAsync } = useWriteContract();
 
@@ -41,9 +45,19 @@ export function AgentDetail({ agent, onBack }: { agent: Agent; onBack: () => voi
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [ratingBusy, setRatingBusy] = useState(false);
   const [ratingDone, setRatingDone] = useState(false);
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+  }, []);
+
+  const wrongChain = isConnected && chainId !== CHAIN_ID;
+  const auditUrl = resolveAuditUrl(agent.webEndpoint);
 
   const repQuery = useQuery({
     queryKey: ["rep", agent.agentId.toString()],
+    enabled: isConfigured(),
+    staleTime: 60_000,
     queryFn: async () => {
       const buyers = await fetchVerifiedBuyers(agent.agentId);
       const [all, verified] = await Promise.all([
@@ -76,7 +90,7 @@ export function AgentDetail({ agent, onBack }: { agent: Agent; onBack: () => voi
       setAudit(res.audit);
       setPaymentTx(res.paymentTx);
     } catch (e) {
-      setErr((e as Error).message);
+      setErr(toMessage(e));
     } finally {
       setBusy(false);
     }
@@ -90,16 +104,18 @@ export function AgentDetail({ agent, onBack }: { agent: Agent; onBack: () => voi
     setRatingBusy(true);
     setErr(null);
     try {
+      const a = requireAddresses();
       await writeContractAsync({
-        address: addresses.reputationRegistry,
+        address: a.reputationRegistry,
         abi: reputationRegistryAbi,
         functionName: "giveFeedback",
         args: [agent.agentId, BigInt(stars), 0, "audit", "", agent.webEndpoint ?? "", "", ZERO_HASH],
       });
       setRatingDone(true);
-      setTimeout(() => void repQuery.refetch(), 3000);
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+      refreshTimer.current = setTimeout(() => void repQuery.refetch(), REP_REFRESH_MS);
     } catch (e) {
-      setErr((e as Error).message);
+      setErr(toMessage(e));
     } finally {
       setRatingBusy(false);
     }
@@ -110,6 +126,23 @@ export function AgentDetail({ agent, onBack }: { agent: Agent; onBack: () => voi
   const name = agent.registration?.name ?? `Agent #${agent.agentId.toString()}`;
   const isVerifiedBuyer =
     !!address && !!rep?.buyers.some((b) => b.toLowerCase() === address.toLowerCase());
+
+  let auditLabel: string;
+  let auditAction: () => void = handleAudit;
+  let auditDisabled = busy;
+  if (!isConnected) {
+    auditLabel = "Connect wallet to audit";
+    auditDisabled = true;
+  } else if (wrongChain) {
+    auditLabel = switching ? "Switching…" : "Switch to Arbitrum Sepolia";
+    auditAction = () => switchChain({ chainId: CHAIN_ID });
+    auditDisabled = switching;
+  } else if (!auditUrl) {
+    auditLabel = "Agent endpoint not configured";
+    auditDisabled = true;
+  } else {
+    auditLabel = busy ? "Awaiting signature & settlement…" : "Audit · pay $0.10 USDC";
+  }
 
   return (
     <main className="container section detail">
@@ -139,12 +172,8 @@ export function AgentDetail({ agent, onBack }: { agent: Agent; onBack: () => voi
           />
 
           <div className="detail__actions">
-            <button className="btn" onClick={handleAudit} disabled={busy || !isConnected}>
-              {busy
-                ? "Awaiting signature & settlement…"
-                : isConnected
-                  ? "Audit · pay $0.10 USDC"
-                  : "Connect wallet to audit"}
+            <button className="btn" onClick={auditAction} disabled={auditDisabled}>
+              {auditLabel}
             </button>
             <span className="hint mono">gasless signature → settled on-chain via x402</span>
           </div>
@@ -170,7 +199,10 @@ export function AgentDetail({ agent, onBack }: { agent: Agent; onBack: () => voi
                 )}
               </div>
               <Findings findings={audit.findings} summary={audit.summary} />
-              {isConnected && <RateRow onRate={handleRate} busy={ratingBusy} done={ratingDone} />}
+              {isConnected && !wrongChain && (
+                <RateRow onRate={handleRate} busy={ratingBusy} done={ratingDone} />
+              )}
+              {wrongChain && <p className="hint mono">Switch to Arbitrum Sepolia to rate.</p>}
             </div>
           )}
         </section>
@@ -179,7 +211,9 @@ export function AgentDetail({ agent, onBack }: { agent: Agent; onBack: () => voi
           <h3 className="side__title">Reputation</h3>
           <div className="side__score">
             <b>{shown && shown.count > 0 ? shown.value.toFixed(1) : "—"}</b>
-            <span>{rep ? `${shown?.count ?? 0} rating(s)` : "loading…"}</span>
+            <span>
+              {repQuery.isError ? "unavailable" : rep ? `${shown?.count ?? 0} rating(s)` : "loading…"}
+            </span>
           </div>
           <label className="toggle">
             <input
@@ -190,9 +224,11 @@ export function AgentDetail({ agent, onBack }: { agent: Agent; onBack: () => voi
             <span>Verified buyers only</span>
           </label>
           <p className="side__note mono">
-            {rep
-              ? `${rep.buyers.length} verified buyer(s) — ERC-8004 reputation filtered by on-chain x402 receipts`
-              : ""}
+            {repQuery.isError
+              ? `couldn't load reputation: ${toMessage(repQuery.error)}`
+              : rep
+                ? `${rep.buyers.length} verified buyer(s) — ERC-8004 reputation filtered by on-chain x402 receipts`
+                : ""}
           </p>
           {isVerifiedBuyer && <span className="badge badge--verified">✓ you’re a verified buyer</span>}
         </aside>

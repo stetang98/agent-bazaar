@@ -20,7 +20,12 @@ export function Header() {
           <span className="brand__name">AGENT&nbsp;BAZAAR</span>
         </div>
         {isConnected ? (
-          <button className="btn btn--ghost mono" onClick={() => disconnect()}>
+          <button
+            className="btn btn--ghost mono"
+            onClick={() => disconnect()}
+            aria-label={`Disconnect wallet ${short(address)}`}
+            title="Disconnect wallet"
+          >
             {short(address)}
           </button>
         ) : (
