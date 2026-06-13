@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useAccount, useChainId, useSwitchChain, useWalletClient, useWriteContract } from "wagmi";
+import { useAccount, useSwitchChain, useWalletClient, useWriteContract } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
 import type { Agent, AuditResult } from "../lib/types";
 import { payAndAudit, resolveAuditUrl } from "../lib/x402Pay";
@@ -31,8 +31,7 @@ contract Vault {
 }`;
 
 export function AgentDetail({ agent, onBack }: { agent: Agent; onBack: () => void }) {
-  const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const { address, isConnected, chainId } = useAccount(); // chainId = the wallet's ACTUAL chain
   const { switchChain, isPending: switching } = useSwitchChain();
   const { data: walletClient } = useWalletClient();
   const { writeContractAsync } = useWriteContract();
@@ -74,8 +73,12 @@ export function AgentDetail({ agent, onBack }: { agent: Agent; onBack: () => voi
     setErr(null);
     setAudit(null);
     setPaymentTx(undefined);
-    if (!walletClient || !address) {
+    if (!address) {
       setErr("Connect your wallet first.");
+      return;
+    }
+    if (!walletClient) {
+      setErr("Wallet client not ready yet — wait a moment and try again.");
       return;
     }
     setBusy(true);
@@ -99,6 +102,10 @@ export function AgentDetail({ agent, onBack }: { agent: Agent; onBack: () => voi
   async function handleRate(stars: number) {
     if (!address) {
       setErr("Connect your wallet first.");
+      return;
+    }
+    if (wrongChain) {
+      setErr("Switch to Arbitrum Sepolia to rate.");
       return;
     }
     setRatingBusy(true);
@@ -141,7 +148,12 @@ export function AgentDetail({ agent, onBack }: { agent: Agent; onBack: () => voi
     auditLabel = "Agent endpoint not configured";
     auditDisabled = true;
   } else {
-    auditLabel = busy ? "Awaiting signature & settlement…" : "Audit · pay $0.10 USDC";
+    auditDisabled = busy || !walletClient;
+    auditLabel = busy
+      ? "Awaiting signature & settlement…"
+      : !walletClient
+        ? "Preparing wallet…"
+        : "Audit · pay $0.10 USDC";
   }
 
   return (
