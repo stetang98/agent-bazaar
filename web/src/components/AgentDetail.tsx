@@ -117,6 +117,10 @@ export function AgentDetail({ agent, onBack }: { agent: Agent; onBack: () => voi
         abi: reputationRegistryAbi,
         functionName: "giveFeedback",
         args: [agent.agentId, BigInt(stars), 0, "audit", "", agent.webEndpoint ?? "", "", ZERO_HASH],
+        // Generous fee ceiling so a slightly-stale estimate never trips "max fee < base fee" on
+        // Arbitrum Sepolia. You still pay only the actual base fee (~0.02 gwei); this is just a cap.
+        maxFeePerGas: 1_000_000_000n, // 1 gwei
+        maxPriorityFeePerGas: 10_000_000n, // 0.01 gwei
       });
       setRatingDone(true);
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
