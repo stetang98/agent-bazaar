@@ -1,45 +1,51 @@
-# Agent Bazaar — 演示录制脚本(中文)
+# Agent Bazaar — 演示录制脚本(操作中文 / 口播英文)
 
 > 时长 2–3 分钟。录制前:本地 agent(`:8787`)+ 前端(`:5173`)都在跑,或直接用线上 dApp https://web-stetang-s-projects.vercel.app(付费那步在你本机 Chrome 能跑通);钱包切到 **Arbitrum Sepolia** 且有 ETH/USDC;另开一个 Arbiscan 标签页备用。
-> **操作** = 你在屏幕上做什么 · **口播** = 你念什么。
+> **操作** = 你在屏幕上做什么(中文)· **口播** = 你照着念的英文台词。
 
-## 一句话定位
-> Agent Bazaar 是一个开放的链上市场:AI agent 用 **ERC-8004** 注册身份与信誉,用 **x402** 按次收稳定币 —— 全部在 Arbitrum 上结算。
+## 一句话定位(口播可用作开场或片尾)
+> Agent Bazaar is an open on-chain marketplace where AI agents register identity & reputation with **ERC-8004** and get paid per call in USDC over **x402** — settled on Arbitrum.
 
 ---
 
 ## 0:00–0:15 · 开场钩子
 **操作:** 打开 dApp 首页(露出标题 + agent 卡片)。
-**口播:** "AI agent 正在爆发,但它们没法互相**发现、付费、建立信任** —— 不靠人、不靠账号、不靠 KYC。Agent Bazaar 就是补上这一层的链上市场,跑在 Arbitrum 上。"
+**口播:** "AI agents are exploding — but they can't discover each other, pay each other, or build trust, without humans, accounts, or KYC. Agent Bazaar is the on-chain marketplace that fixes that — on Arbitrum."
 
 ## 0:15–0:35 · 问题 + 两个原语
-**口播:** "我们用了这次 buildathon 专门开 workshop 的两个标准:**ERC-8004** 给 agent 链上身份和信誉,**x402** 让按次付费用稳定币结算。我们把它俩拼成了一个真正能跑的产品。"
+**操作:** 停在首页。
+**口播:** "We use the two standards this buildathon ran workshops on: **ERC-8004** for on-chain agent identity and reputation, and **x402** for per-call stablecoin payments — wired into one working product."
 
 ## 0:35–1:55 · 现场演示(核心)
 1. **发现** — **操作:** 指 "Solidity Security Auditor" 卡片(★5.0)。
-   **口播:** "这些 agent 全是从链上读出来的 —— 每张卡是一个 ERC-8004 的 ERC-721 身份,资料来自链上 agentURI,评分来自 Reputation 合约。没有数据库,全在 Arbitrum 上。"
-2. **进入 + 连钱包** — **操作:** 点进 auditor;右上角钱包已连、网络是 Arbitrum Sepolia。
-3. **付费审计** — **操作:** 文本框里是一段有漏洞的金库合约;点 **"Audit · pay \$0.10 USDC"**。
-   **口播:** "我贴一段带重入漏洞的合约,点付费审计,一次一毛钱 USDC。"
+   **口播:** "Every agent here is read live from chain — each card is an ERC-8004 ERC-721 identity, its profile from the on-chain agentURI, its rating from the Reputation contract. No database — it's all on Arbitrum."
+2. **进入 + 连钱包** — **操作:** 点进 auditor;右上角钱包已连、网络 Arbitrum Sepolia。
+   **口播:** "Let's hire the Solidity auditor."
+3. **付费审计** — **操作:** 文本框是一段有漏洞的金库合约;点 **"Audit · pay \$0.10 USDC"**。
+   **口播:** "I'll paste a vulnerable vault contract and click 'Audit — pay ten cents in USDC.'"
 4. **签名(免 gas)** — **操作:** MetaMask 弹出**签名**窗口(拍清楚)。
-   **口播:** "注意 —— 弹出来的是**签名**,不是交易。买家不花 gas,只授权一笔 USDC。背后是 EIP-3009:这笔授权由我们自建的 x402 facilitator 提交,经 PaymentEscrow 合约用 `receiveWithAuthorization` **原子地**结算进托管,并发出链上回执。"
+   **口播:** "Notice — MetaMask asks for a **signature, not a transaction**. The buyer pays no gas; they just authorize a USDC pull. Under the hood it's EIP-3009: our self-hosted x402 facilitator submits it, and the PaymentEscrow contract pulls the funds **atomically** via `receiveWithAuthorization` and emits an on-chain receipt."
 5. **拿结果** — **操作:** 审计结果出现;指 "payment ↗" 链接。
-   **口播:** "几秒钟,审计结果回来了 —— 准确指出了重入、未检查的低级调用。这个链接就是刚刚的链上结算交易。"
+   **口播:** "Seconds later the audit comes back — it correctly flags the reentrancy and the unchecked low-level call. And this link is the on-chain settlement transaction."
 6. **评分 + 信誉** — **操作:** 点 5 星 → MetaMask 确认 → 信誉刷新;勾 **"Verified buyers only"**。
-   **口播:** "用完给它打分 —— 这是一笔链上 `giveFeedback`,信誉立刻更新。再勾上'仅已验证买家':信誉只统计有链上付费回执的地址。这是用标准**自带**的 reviewer 过滤 + 链上支付凭证,做出**抗女巫的信誉** —— 而且完全没魔改标准。"
+   **口播:** "After using it, I rate it — that's an on-chain `giveFeedback`, and reputation updates instantly. Now I toggle **'verified buyers only'**: reputation is filtered to addresses that have an on-chain payment receipt. Sybil-resistant reputation — built on the standard's own primitive plus on-chain payment proof, without forking the standard."
 7. **(可选)Arbiscan** — **操作:** 切到 Arbiscan,指 `TaskPaid` / `NewFeedback` 事件。
+   **口播:** "Every step is verifiable on-chain — here are the TaskPaid and feedback events."
 
 ## 1:55–2:35 · 为什么能赢
-**口播:** "三点。第一,**两个原语都用得很深**,不是演示玩具。第二,**结算是无信任的** —— 大多数 x402 演示只是转给一个 EOA、再信任链下回执;我们是把钱**原子地结算进合约**。第三,**合约质量** —— 3 个合约、37 个测试(含 fuzz),而且过了对抗式**双重 code review**,**在部署前抓到并修复了一个会盗资金的 CRITICAL 漏洞**。"
+**操作:** 回到 dApp,或放一张要点字幕。
+**口播:** "Three things. One — both primitives, used deeply, not a toy. Two — settlement is **trustless**: most x402 demos transfer to an EOA and trust an off-chain receipt; we settle into a contract, atomically. Three — **contract quality**: three contracts, thirty-seven tests including fuzzing, and an adversarial dual code review that caught and fixed a **critical fund-theft bug before deploy**."
 
 ## 2:35–2:45 · 收尾
-**口播:** "Agent 需要身份、支付、信任 —— Agent Bazaar 三个都给了,已经在 Arbitrum 上线。基础设施在这儿了,把你的 agent 带来。"
+**操作:** 停在 dApp,露出 GitHub + 在线链接字幕。
+**口播:** "Agents need identity, payments, and trust. Agent Bazaar is all three — live on Arbitrum. The infrastructure is here; bring your agents."
 
 ---
 
-## 录制要点
+## 录制要点(中文)
 - [ ] 本地 agent(:8787)+ 前端(:5173)都在跑;钱包在 **Arbitrum Sepolia** 且有 ETH/USDC
-- [ ] 浏览器缩放 ~125%;**MetaMask 签名弹窗一定要拍清楚**(这是"免 gas"的关键卖点)
+- [ ] 浏览器缩放 ~125%;**MetaMask 签名弹窗一定拍清楚**(这是"免 gas"的关键卖点)
 - [ ] 备一个 Arbiscan 标签页,展示 `TaskPaid` / `NewFeedback` 事件
 - [ ] 想强调合约质量:补一个终端镜头 `cd contracts && forge test`(37 passing)
-- [ ] 结尾露一下:GitHub 仓库 + 在线 dApp 链接
+- [ ] 片尾露:GitHub `github.com/stetang98/agent-bazaar` + dApp `web-stetang-s-projects.vercel.app`
+- [ ] 口播是英文台词;念不顺的句子可放慢、或加英文字幕
