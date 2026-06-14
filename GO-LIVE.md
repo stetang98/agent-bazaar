@@ -132,6 +132,17 @@ cd web && npm run dev          # 打开 http://localhost:5173
 
 ---
 
+## ☑️ 第 6.5 步：（可选）部署前端到 Vercel 公网
+
+在 `web/` 目录、你自己的终端里（需要你的 Vercel 账号）：
+```bash
+cd web
+npx vercel login      # 选 GitHub/邮箱登录
+npx vercel --prod     # 一路默认；vercel.json 已配好 Vite build
+```
+- 前端已做成**零配置可 build**（内置已部署地址）。
+- ⚠️ 公网站点的「发现 / 信誉 / 链上数据」对所有人可用；「付费审计」需连 agent 后端（本地 `:8787`）。完整付费演示走 demo 视频，或把 agent 也部署到公网后，把 `VITE_AGENT_BASE_URL` 指过去 + agent 用公网 `PUBLIC_URL` 重新注册。
+
 ## ☑️ 第 7 步：提交
 
 - [ ] push 到 GitHub（你的账号 `stetang98`）：我可以帮你建仓 + push（你确认即可）

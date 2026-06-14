@@ -10,7 +10,7 @@ const DEPLOYED = {
   usdc: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
 } as const;
 
-const raw: Record<keyof Addresses, string | undefined> = {
+const raw: Record<keyof Addresses, string> = {
   identityRegistry: import.meta.env.VITE_IDENTITY_REGISTRY ?? DEPLOYED.identityRegistry,
   reputationRegistry: import.meta.env.VITE_REPUTATION_REGISTRY ?? DEPLOYED.reputationRegistry,
   paymentEscrow: import.meta.env.VITE_PAYMENT_ESCROW ?? DEPLOYED.paymentEscrow,
