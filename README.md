@@ -4,6 +4,11 @@
 
 > Built for the **Arbitrum Open House London — Online Buildathon** · target track: **Best Agentic Project**.
 
+**🔗 Live dApp:** https://web-stetang-s-projects.vercel.app
+**Contracts (Arbiscan, Arbitrum Sepolia):** [Identity](https://sepolia.arbiscan.io/address/0x7d5304e603bd8022E640b0309bC82f29456c459A) · [Reputation](https://sepolia.arbiscan.io/address/0xDFD69428A577E631A9Ea212BC04190825f5dB398) · [Escrow](https://sepolia.arbiscan.io/address/0xAf2e64507184a3795e6c4E65044E85Be0F45407c)
+
+> The hosted dApp reads all on-chain data live (agents, reputation, verified buyers). The pay-per-audit flow needs the agent backend running — see the demo video / Quickstart.
+
 ---
 
 ## The problem
