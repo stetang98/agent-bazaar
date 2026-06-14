@@ -39,24 +39,29 @@ SUB=(
 srt_ts() { awk -v s="$1" 'BEGIN{h=int(s/3600);m=int((s-h*3600)/60);x=s-h*3600-m*60;printf "%02d:%02d:%06.3f",h,m,x}' | sed 's/\./,/'; }
 
 gen_narration() {
-  rm -f "$OUT"/beat_*.aiff "$OUT"/narration.* "$OUT"/demo.srt "$OUT"/concat.txt "$OUT"/gap.aiff
-  ffmpeg -y -f lavfi -i anullsrc=r=44100:cl=mono -t "$GAP" "$OUT/gap.aiff" -loglevel error
+  rm -f "$OUT"/beat_*.wav "$OUT"/raw_*.aiff "$OUT"/narration.* "$OUT"/demo.srt "$OUT"/concat.txt "$OUT"/gap.wav
+  # Every segment MUST share one format: 44.1 kHz mono PCM. `say` emits 22.05 kHz;
+  # a 44.1 kHz gap mixed in makes the concat demuxer replay clips at the wrong
+  # rate → distorted "robotic/alien" audio. Normalize each clip before concat.
+  ffmpeg -y -f lavfi -i anullsrc=r=44100:cl=mono -t "$GAP" -c:a pcm_s16le "$OUT/gap.wav" -loglevel error
   : > "$OUT/concat.txt"; : > "$OUT/demo.srt"
-  echo "file 'gap.aiff'" >> "$OUT/concat.txt"
+  echo "file 'gap.wav'" >> "$OUT/concat.txt"
   local t="$GAP" idx=0
   echo "── 分镜时间表(录屏时按这个节奏操作)──"
   for i in "${!SPOKEN[@]}"; do
-    say -v "$VOICE" -o "$OUT/beat_$i.aiff" "${SPOKEN[$i]}"
+    say -v "$VOICE" -o "$OUT/raw_$i.aiff" "${SPOKEN[$i]}"
+    ffmpeg -y -i "$OUT/raw_$i.aiff" -ar 44100 -ac 1 -c:a pcm_s16le "$OUT/beat_$i.wav" -loglevel error
     local dur start end
-    dur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT/beat_$i.aiff")
+    dur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT/beat_$i.wav")
     start="$t"; end=$(awk -v a="$t" -v b="$dur" 'BEGIN{printf "%.3f",a+b}')
     idx=$((idx+1))
     printf "%d\n%s --> %s\n%s\n\n" "$idx" "$(srt_ts "$start")" "$(srt_ts "$end")" "${SUB[$i]}" >> "$OUT/demo.srt"
-    echo "file 'beat_$i.aiff'" >> "$OUT/concat.txt"; echo "file 'gap.aiff'" >> "$OUT/concat.txt"
+    echo "file 'beat_$i.wav'" >> "$OUT/concat.txt"; echo "file 'gap.wav'" >> "$OUT/concat.txt"
     t=$(awk -v a="$end" -v g="$GAP" 'BEGIN{printf "%.3f",a+g}')
     printf "  beat %d  起 %5.1fs  时长 %4.1fs  | %s\n" "$idx" "$start" "$dur" "${SUB[$i]}"
   done
-  ( cd "$OUT" && ffmpeg -y -f concat -safe 0 -i concat.txt -c:a aac -b:a 160k narration.m4a -loglevel error )
+  ( cd "$OUT" && ffmpeg -y -f concat -safe 0 -i concat.txt -ar 44100 -ac 1 -c:a aac -b:a 160k narration.m4a -loglevel error )
+  rm -f "$OUT"/raw_*.aiff
   echo "──"
   echo "总时长: $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT/narration.m4a")s"
   echo "配音: $OUT/narration.m4a"
@@ -69,7 +74,7 @@ do_mux() {
   [ -f "$OUT/narration.m4a" ] || { echo "请先跑: make-demo.sh narration"; exit 1; }
   ffmpeg -y -i "$vid" -i "$OUT/narration.m4a" \
     -vf "subtitles='$OUT/demo.srt':force_style='Fontsize=16,Outline=2,Shadow=0,MarginV=36'" \
-    -map 0:v:0 -map 1:a:0 -c:v libx264 -pix_fmt yuv420p -preset veryfast -crf 20 -c:a aac -shortest "$final" -loglevel error
+    -map 0:v:0 -map 1:a:0 -c:v libx264 -pix_fmt yuv420p -preset veryfast -crf 20 -c:a copy -shortest "$final" -loglevel error
   echo "成片: $final"
 }
 
