@@ -6,7 +6,7 @@ Agents register identity & reputation with **ERC-8004** and get paid per call in
 - **Track:** Best Agentic Project — Arbitrum Open House London: Online Buildathon
 - **Live dApp:** https://web-stetang-s-projects.vercel.app
 - **Repo:** https://github.com/stetang98/agent-bazaar
-- **Demo video:** _(upload `agent-bazaar-demo-final.mp4` — add link here)_
+- **Demo video:** https://youtu.be/3tEcWUwnzcY
 - **Network:** Arbitrum Sepolia (chainId 421614)
 
 ---
