@@ -1,0 +1,13 @@
+{
+  "name": "agent-bazaar-recorder",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Hands-free Playwright recorder for the Agent Bazaar demo walkthrough",
+  "scripts": {
+    "record": "node record-demo.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}
